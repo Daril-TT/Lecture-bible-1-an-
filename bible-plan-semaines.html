@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bible en 1 an · Vue semaines</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0a;
+    --bg2: #1c1c1e;
+    --bg3: #2c2c2e;
+    --bg-green: #162316;
+    --text: #f5f5f7;
+    --text2: #aeaeb2;
+    --text3: #6e6e73;
+    --text4: #3a3a3c;
+    --purple: #bf5af2;
+    --blue: #5e9ce6;
+    --indigo: #5e5ce6;
+    --green: #30d158;
+    --border: rgba(255,255,255,0.07);
+    --r: 14px;
+    --r-sm: 10px;
+  }
+
+  html { background: var(--bg); }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+    background: var(--bg); color: var(--text); min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app { max-width: 720px; margin: 0 auto; padding-bottom: 80px; }
+
+  /* ── STICKY HEADER ─────── */
+  .header {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(10,10,10,0.9);
+    backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+    border-bottom: 0.5px solid var(--border);
+    padding: 32px 24px 14px;
+  }
+
+  .hrow1 { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 14px; }
+  .htitle h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
+  .htitle p { font-size: 12px; color: var(--text3); margin-top: 3px; }
+  .view-toggle {
+    display: flex; gap: 3px; background: var(--bg2); border-radius: 10px; padding: 3px;
+    border: 0.5px solid var(--border);
+  }
+  .vbtn {
+    padding: 5px 12px; border-radius: 8px; border: none; font-size: 12px;
+    font-weight: 500; cursor: pointer; font-family: inherit; transition: all 0.15s;
+    background: transparent; color: var(--text3);
+  }
+  .vbtn.on { background: var(--indigo); color: #fff; }
+
+  /* progress */
+  .prog-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .bar-track { flex: 1; background: var(--bg3); border-radius: 100px; height: 5px; overflow: hidden; }
+  .bar-fill { height: 100%; background: linear-gradient(90deg, var(--indigo), var(--purple)); border-radius: 100px; transition: width .5s cubic-bezier(.4,0,.2,1); }
+  .pct { font-size: 12px; color: var(--text3); flex-shrink: 0; min-width: 34px; text-align: right; }
+
+  .stats { display: flex; gap: 8px; }
+  .stat { flex: 1; background: var(--bg2); border-radius: var(--r-sm); padding: 9px 12px; border: 0.5px solid var(--border); }
+  .stat-v { font-size: 20px; font-weight: 600; letter-spacing: -.4px; }
+  .stat-l { font-size: 10px; color: var(--text3); margin-top: 1px; text-transform: uppercase; letter-spacing: .3px; }
+
+  /* ── NAV (month / week) ── */
+  .nav-bar { padding: 10px 0 0; }
+  .nav-scroll { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+  .nav-scroll::-webkit-scrollbar { display: none; }
+  .nbtn {
+    flex-shrink: 0; padding: 5px 12px; border-radius: 20px; border: 0.5px solid var(--border);
+    font-size: 11.5px; font-weight: 500; cursor: pointer; transition: all .15s;
+    background: transparent; color: var(--text3); font-family: inherit; white-space: nowrap;
+  }
+  .nbtn:hover { color: var(--text); border-color: rgba(255,255,255,.18); }
+  .nbtn.on { background: var(--indigo); color: #fff; border-color: transparent; }
+  .nbtn.partial { border-color: rgba(94,92,230,.5); color: var(--indigo); }
+  .nbtn.full { background: rgba(48,209,88,.12); border-color: rgba(48,209,88,.3); color: var(--green); }
+
+  /* ── BODY ──────────────── */
+  .body { padding: 16px 16px 0; }
+
+  /* completion */
+  .done-banner { display: none; margin-bottom: 16px; background: linear-gradient(135deg,#1a1a3e,#2a1040); border: 1px solid rgba(94,92,230,.5); border-radius: var(--r); padding: 20px; text-align: center; }
+  .done-banner.show { display: block; }
+  .done-banner h2 { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+  .done-banner p { font-size: 13px; color: var(--text3); }
+
+  /* ── WEEK VIEW ─────────── */
+  .week-block { margin-bottom: 20px; }
+
+  .week-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px; padding: 0 2px;
+  }
+  .week-title { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: .6px; }
+  .week-dots { display: flex; gap: 4px; }
+  .wdot { width: 7px; height: 7px; border-radius: 50%; background: var(--bg3); transition: background .2s; }
+  .wdot.done { background: var(--green); }
+  .wdot.today { background: var(--indigo); }
+  .week-pct { font-size: 11px; color: var(--text3); }
+
+  /* week progress bar */
+  .week-bar { height: 3px; background: var(--bg3); border-radius: 100px; overflow: hidden; margin-bottom: 8px; }
+  .week-bar-fill { height: 100%; background: linear-gradient(90deg, var(--indigo), var(--purple)); border-radius: 100px; transition: width .4s; }
+  .week-bar-fill.complete { background: linear-gradient(90deg, var(--green), #25a244); }
+
+  /* day cards in week */
+  .week-days { display: flex; flex-direction: column; gap: 4px; }
+
+  .day {
+    background: var(--bg2); border-radius: 12px; border: 0.5px solid var(--border);
+    overflow: hidden; transition: background .2s;
+  }
+  .day.done { background: var(--bg-green); border-color: rgba(48,209,88,.12); }
+  .day.today { border-color: var(--indigo); border-width: 1px; }
+
+  .day-row {
+    display: flex; align-items: center; padding: 11px 13px; gap: 11px;
+    cursor: pointer; user-select: none;
+  }
+
+  .check {
+    width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--text4);
+    flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    transition: all .2s; cursor: pointer;
+  }
+  .day.done .check { background: var(--green); border-color: var(--green); }
+  .check svg { width: 12px; height: 12px; stroke: #fff; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; opacity: 0; transition: opacity .15s; }
+  .day.done .check svg { opacity: 1; }
+
+  .day-info { flex: 1; min-width: 0; }
+  .day-top { display: flex; align-items: center; gap: 7px; margin-bottom: 2px; }
+  .day-date { font-size: 13px; font-weight: 500; }
+  .today-pill { font-size: 10px; font-weight: 600; background: var(--indigo); color: #fff; border-radius: 6px; padding: 1px 6px; }
+  .day-refs { font-size: 12px; color: var(--text3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .at { color: var(--purple); }
+  .nt { color: var(--blue); }
+
+  .chevron { flex-shrink: 0; color: var(--text4); transition: transform .2s; }
+  .chevron svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; }
+  .day.open .chevron { transform: rotate(180deg); }
+
+  .day-detail { display: none; padding: 0 13px 12px 46px; }
+  .day.open .day-detail { display: block; }
+
+  .ref-pills { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  .ref-group .ref-label { font-size: 10px; font-weight: 600; letter-spacing: .5px; color: var(--text3); text-transform: uppercase; margin-bottom: 3px; }
+  .ref-pill { display: inline-block; font-size: 12px; padding: 4px 10px; border-radius: 8px; }
+  .ref-pill.at { background: rgba(191,90,242,.1); color: var(--purple); }
+  .ref-pill.nt { background: rgba(94,156,230,.1); color: var(--blue); }
+
+  .note-box { background: #111; border-radius: 9px; border: 0.5px solid var(--border); padding: 9px 11px; }
+  .note-box textarea { width: 100%; background: transparent; border: none; outline: none; font-size: 13px; color: var(--text); resize: none; font-family: inherit; line-height: 1.6; min-height: 60px; }
+  .note-box textarea::placeholder { color: var(--text4); }
+  .note-hint { font-size: 10px; color: var(--text4); margin-top: 4px; transition: color .3s; }
+  .note-hint.flash { color: var(--green); }
+
+  /* ── MONTH VIEW ────────── */
+  .month-days { display: flex; flex-direction: column; gap: 5px; }
+
+  @media (max-width: 480px) {
+    .header { padding: 24px 16px 12px; }
+    .htitle h1 { font-size: 22px; }
+    .body { padding: 12px 10px 0; }
+    .stats { gap: 6px; }
+    .stat-v { font-size: 18px; }
+    .day-detail { padding-left: 42px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="header">
+    <div class="hrow1">
+      <div class="htitle">
+        <h1>📖 Bible en 1 an</h1>
+        <p>1er juin 2026 → 1er juin 2027</p>
+      </div>
+      <div class="view-toggle">
+        <button class="vbtn on" id="vbtn-week" onclick="setView('week')">Semaines</button>
+        <button class="vbtn" id="vbtn-month" onclick="setView('month')">Mois</button>
+      </div>
+    </div>
+    <div class="prog-row">
+      <div class="bar-track"><div class="bar-fill" id="bar" style="width:0%"></div></div>
+      <div class="pct" id="pct">0%</div>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="stat-v" id="s-done">0</div><div class="stat-l">Jours lus</div></div>
+      <div class="stat"><div class="stat-v" id="s-weeks">0</div><div class="stat-l">Semaines finies</div></div>
+      <div class="stat"><div class="stat-v" id="s-streak">0</div><div class="stat-l">Série</div></div>
+      <div class="stat"><div class="stat-v" id="s-left">367</div><div class="stat-l">Restants</div></div>
+    </div>
+    <div class="nav-bar">
+      <div class="nav-scroll" id="nav-scroll"></div>
+    </div>
+  </div>
+
+  <div class="body">
+    <div class="done-banner" id="done-banner">
+      <h2>🎉 Bible lue en 1 an !</h2>
+      <p>Félicitations — tu as parcouru l'intégralité des Écritures.</p>
+    </div>
+    <div id="content"></div>
+  </div>
+
+</div>
+<script>
+// ═══════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════
+const PLAN = [
+  {d:"2026-06-01",j:"Lun",at:"Genèse 1–2",nt:"Matthieu 1"},
+  {d:"2026-06-02",j:"Mar",at:"Genèse 3–4",nt:"Matthieu 2"},
+  {d:"2026-06-03",j:"Mer",at:"Genèse 5–6",nt:"Matthieu 3"},
+  {d:"2026-06-04",j:"Jeu",at:"Genèse 7–8",nt:"Matthieu 4"},
+  {d:"2026-06-05",j:"Ven",at:"Genèse 9–10",nt:"Matthieu 5.1-26"},
+  {d:"2026-06-06",j:"Sam",at:"Genèse 11–13",nt:"Matthieu 5.27-48"},
+  {d:"2026-06-07",j:"Dim",at:"Genèse 14–15",nt:"Matthieu 6"},
+  {d:"2026-06-08",j:"Lun",at:"Genèse 16–17",nt:"Matthieu 7"},
+  {d:"2026-06-09",j:"Mar",at:"Genèse 18–19",nt:"Matthieu 8"},
+  {d:"2026-06-10",j:"Mer",at:"Genèse 20–21",nt:"Matthieu 9.1-34"},
+  {d:"2026-06-11",j:"Jeu",at:"Genèse 22–23",nt:"Matthieu 9.35–10.15"},
+  {d:"2026-06-12",j:"Ven",at:"Genèse 24",nt:"Matthieu 10.16–11.1"},
+  {d:"2026-06-13",j:"Sam",at:"Genèse 25–26",nt:"Matthieu 11.2-30"},
+  {d:"2026-06-14",j:"Dim",at:"Genèse 27–28",nt:"Matthieu 12.1-13"},
+  {d:"2026-06-15",j:"Lun",at:"Genèse 29–30",nt:"Matthieu 12.14-45"},
+  {d:"2026-06-16",j:"Mar",at:"Genèse 31–32",nt:"Matthieu 12.46–13.23"},
+  {d:"2026-06-17",j:"Mer",at:"Genèse 33–34",nt:"Matthieu 13.24-43"},
+  {d:"2026-06-18",j:"Jeu",at:"Genèse 35–36",nt:"Matthieu 13.44-58"},
+  {d:"2026-06-19",j:"Ven",at:"1 Chroniques 1",nt:"Matthieu 14"},
+  {d:"2026-06-20",j:"Sam",at:"Genèse 37–38",nt:"Matthieu 15.1-20"},
+  {d:"2026-06-21",j:"Dim",at:"Genèse 39–40",nt:"Matthieu 15.21-39"},
+  {d:"2026-06-22",j:"Lun",at:"Genèse 41",nt:"Matthieu 16"},
+  {d:"2026-06-23",j:"Mar",at:"Genèse 42–43",nt:"Matthieu 17"},
+  {d:"2026-06-24",j:"Mer",at:"Genèse 44–45",nt:"Matthieu 18.1-14"},
+  {d:"2026-06-25",j:"Jeu",at:"Genèse 46–47",nt:"Matthieu 18.15-35"},
+  {d:"2026-06-26",j:"Ven",at:"Genèse 48–49",nt:"Matthieu 19.1-12"},
+  {d:"2026-06-27",j:"Sam",at:"Genèse 50",nt:"Matthieu 19.13-30"},
+  {d:"2026-06-28",j:"Dim",at:"Job 1–3",nt:"Matthieu 20.1-16"},
+  {d:"2026-06-29",j:"Lun",at:"Job 4–5",nt:"Matthieu 20.17-34"},
+  {d:"2026-06-30",j:"Mar",at:"Job 6–7",nt:"Matthieu 21.1-22"},
+  {d:"2026-07-01",j:"Mer",at:"Job 8–9",nt:"Matthieu 21.23-32"},
+  {d:"2026-07-02",j:"Jeu",at:"Job 10–11",nt:"Matthieu 21.33-46"},
+  {d:"2026-07-03",j:"Ven",at:"Job 12–14",nt:"Matthieu 22.1-14"},
+  {d:"2026-07-04",j:"Sam",at:"Job 15–17",nt:"Matthieu 22.15-40"},
+  {d:"2026-07-05",j:"Dim",at:"Job 18–19",nt:"Matthieu 22.41–23.15"},
+  {d:"2026-07-06",j:"Lun",at:"Job 20–21",nt:"Matthieu 23.16-39"},
+  {d:"2026-07-07",j:"Mar",at:"Job 22–23",nt:"Matthieu 24.1-35"},
+  {d:"2026-07-08",j:"Mer",at:"Job 24–26",nt:"Matthieu 24.36-51"},
+  {d:"2026-07-09",j:"Jeu",at:"Job 27–29",nt:"Matthieu 25.1-30"},
+  {d:"2026-07-10",j:"Ven",at:"Job 30–31",nt:"Matthieu 25.31–26.5"},
+  {d:"2026-07-11",j:"Sam",at:"Job 32–33",nt:"Matthieu 26.6-34"},
+  {d:"2026-07-12",j:"Dim",at:"Job 34–35",nt:"Matthieu 26.35-56"},
+  {d:"2026-07-13",j:"Lun",at:"Job 36–37",nt:"Matthieu 26.57-75"},
+  {d:"2026-07-14",j:"Mar",at:"Job 38.1–40.5",nt:"Matthieu 27.1-31"},
+  {d:"2026-07-15",j:"Mer",at:"Job 40.6–42.17",nt:"Matthieu 27.32-66"},
+  {d:"2026-07-16",j:"Jeu",at:"Exode 1.1–2.22",nt:"Matthieu 28"},
+  {d:"2026-07-17",j:"Ven",at:"Exode 2.23–4.18",nt:"Marc 1.1-20"},
+  {d:"2026-07-18",j:"Sam",at:"Exode 4.19–5.23",nt:"Marc 1.21-45"},
+  {d:"2026-07-19",j:"Dim",at:"Exode 6.1–7.24",nt:"Marc 2.1-22"},
+  {d:"2026-07-20",j:"Lun",at:"Exode 7.25–8.28",nt:"Marc 2.23–3.19"},
+  {d:"2026-07-21",j:"Mar",at:"Exode 9",nt:"Marc 3.20-35"},
+  {d:"2026-07-22",j:"Mer",at:"Exode 10–11",nt:"Marc 4.1-25"},
+  {d:"2026-07-23",j:"Jeu",at:"Exode 12",nt:"Marc 4.26-41"},
+  {d:"2026-07-24",j:"Ven",at:"Exode 13–14",nt:"Marc 5.1-20"},
+  {d:"2026-07-25",j:"Sam",at:"Exode 15–16",nt:"Marc 5.21-43"},
+  {d:"2026-07-26",j:"Dim",at:"Exode 17–18",nt:"Marc 6.1-29"},
+  {d:"2026-07-27",j:"Lun",at:"Exode 19–20",nt:"Marc 6.30-56"},
+  {d:"2026-07-28",j:"Mar",at:"Exode 21–22",nt:"Marc 7.1-23"},
+  {d:"2026-07-29",j:"Mer",at:"Exode 23–24",nt:"Marc 7.24-37"},
+  {d:"2026-07-30",j:"Jeu",at:"Exode 25",nt:"Marc 8.1-26"},
+  {d:"2026-07-31",j:"Ven",at:"Exode 26",nt:"Marc 8.27–9.1"},
+  {d:"2026-08-01",j:"Sam",at:"Exode 27–28",nt:"Marc 9.2-32"},
+  {d:"2026-08-02",j:"Dim",at:"Exode 29",nt:"Marc 9.33-50"},
+  {d:"2026-08-03",j:"Lun",at:"Exode 30–31",nt:"Marc 10.1-31"},
+  {d:"2026-08-04",j:"Mar",at:"Exode 32–33",nt:"Marc 10.32-52"},
+  {d:"2026-08-05",j:"Mer",at:"Exode 34",nt:"Marc 11.1-19"},
+  {d:"2026-08-06",j:"Jeu",at:"Exode 35.1–36.19",nt:"Marc 11.20–12.12"},
+  {d:"2026-08-07",j:"Ven",at:"Exode 36.20–38.31",nt:"Marc 12.13-34"},
+  {d:"2026-08-08",j:"Sam",at:"Exode 39–40",nt:"Marc 12.35–13.13"},
+  {d:"2026-08-09",j:"Dim",at:"Lévitique 1–3",nt:"Marc 13.14-37"},
+  {d:"2026-08-10",j:"Lun",at:"Lévitique 4–5",nt:"Marc 14.1-11"},
+  {d:"2026-08-11",j:"Mar",at:"Lévitique 6–7",nt:"Marc 14.12-31"},
+  {d:"2026-08-12",j:"Mer",at:"Lévitique 8–10",nt:"Marc 14.32-52"},
+  {d:"2026-08-13",j:"Jeu",at:"Lévitique 11–12",nt:"Marc 14.53-72"},
+  {d:"2026-08-14",j:"Ven",at:"Lévitique 13",nt:"Marc 15.1-20"},
+  {d:"2026-08-15",j:"Sam",at:"Lévitique 14",nt:"Marc 15.21-47"},
+  {d:"2026-08-16",j:"Dim",at:"Lévitique 15–16",nt:"Marc 16"},
+  {d:"2026-08-17",j:"Lun",at:"Lévitique 17–18",nt:"Luc 1.1-25"},
+  {d:"2026-08-18",j:"Mar",at:"Lévitique 19–20",nt:"Luc 1.26-56"},
+  {d:"2026-08-19",j:"Mer",at:"Lévitique 21–23",nt:"Luc 1.57-80"},
+  {d:"2026-08-20",j:"Jeu",at:"Lévitique 24–25",nt:"Luc 2.1-20"},
+  {d:"2026-08-21",j:"Ven",at:"Lévitique 26–27",nt:"Luc 2.21-52"},
+  {d:"2026-08-22",j:"Sam",at:"Nombres 1–2",nt:"Luc 3.1-22"},
+  {d:"2026-08-23",j:"Dim",at:"Nombres 3–4",nt:"Luc 3.23–4.13"},
+  {d:"2026-08-24",j:"Lun",at:"Nombres 5–6",nt:"Luc 4.14-30"},
+  {d:"2026-08-25",j:"Mar",at:"Nombres 7",nt:"Luc 4.31-44"},
+  {d:"2026-08-26",j:"Mer",at:"Nombres 8–10",nt:"Luc 5.1-26"},
+  {d:"2026-08-27",j:"Jeu",at:"Nombres 11–12",nt:"Luc 5.27–6.11"},
+  {d:"2026-08-28",j:"Ven",at:"Nombres 13–14",nt:"Luc 6.12-36"},
+  {d:"2026-08-29",j:"Sam",at:"1 Chroniques 2 ; Nombres 15",nt:"Luc 6.37–7.10"},
+  {d:"2026-08-30",j:"Dim",at:"Nombres 16–18",nt:"Luc 7.11-35"},
+  {d:"2026-08-31",j:"Lun",at:"Nombres 19–21",nt:"Luc 7.36–8.3"},
+  {d:"2026-09-01",j:"Mar",at:"Nombres 22–24",nt:"Luc 8.4-21"},
+  {d:"2026-09-02",j:"Mer",at:"Nombres 25–26",nt:"Luc 8.22-39"},
+  {d:"2026-09-03",j:"Jeu",at:"Nombres 27.1–30.1",nt:"Luc 8.40–9.17"},
+  {d:"2026-09-04",j:"Ven",at:"Nombres 30.2–31.54",nt:"Luc 9.18-45"},
+  {d:"2026-09-05",j:"Sam",at:"Nombres 32–33",nt:"Luc 9.46-62"},
+  {d:"2026-09-06",j:"Dim",at:"Nombres 34–36",nt:"Luc 10.1-37"},
+  {d:"2026-09-07",j:"Lun",at:"Deutéronome 1–2",nt:"Luc 10.38–11.13"},
+  {d:"2026-09-08",j:"Mar",at:"Deutéronome 3.1–4.43",nt:"Luc 11.14-36"},
+  {d:"2026-09-09",j:"Mer",at:"Deutéronome 4.44–6.25",nt:"Luc 11.37–12.12"},
+  {d:"2026-09-10",j:"Jeu",at:"Deutéronome 7–9",nt:"Luc 12.13-48"},
+  {d:"2026-09-11",j:"Ven",at:"Deutéronome 10–11",nt:"Luc 12.49–13.9"},
+  {d:"2026-09-12",j:"Sam",at:"Deutéronome 12–14",nt:"Luc 13.10-35"},
+  {d:"2026-09-13",j:"Dim",at:"Deutéronome 15–17",nt:"Luc 14.1-24"},
+  {d:"2026-09-14",j:"Lun",at:"Deutéronome 18–20",nt:"Luc 14.25–15.10"},
+  {d:"2026-09-15",j:"Mar",at:"Deutéronome 21–23",nt:"Luc 15.11-32"},
+  {d:"2026-09-16",j:"Mer",at:"Deutéronome 24–26",nt:"Luc 16.1-18"},
+  {d:"2026-09-17",j:"Jeu",at:"Deutéronome 27.1–28.57",nt:"Luc 16.19-31"},
+  {d:"2026-09-18",j:"Ven",at:"Deutéronome 28.58–30.20",nt:"Luc 17.1-19"},
+  {d:"2026-09-19",j:"Sam",at:"Deutéronome 31–32",nt:"Luc 17.20-37"},
+  {d:"2026-09-20",j:"Dim",at:"Deutéronome 33–34 ; Psaumes 90",nt:"Luc 18.1-14"},
+  {d:"2026-09-21",j:"Lun",at:"Josué 1–3",nt:"Luc 18.15-34"},
+  {d:"2026-09-22",j:"Mar",at:"Josué 4–6",nt:"Luc 18.35–19.27"},
+  {d:"2026-09-23",j:"Mer",at:"Josué 7–9",nt:"Luc 19.28–20.8"},
+  {d:"2026-09-24",j:"Jeu",at:"Josué 10–12",nt:"Luc 20.9-26"},
+  {d:"2026-09-25",j:"Ven",at:"Josué 13–15",nt:"Luc 20.27-47"},
+  {d:"2026-09-26",j:"Sam",at:"Josué 16–19",nt:"Luc 21.1-19"},
+  {d:"2026-09-27",j:"Dim",at:"Josué 20–21",nt:"Luc 21.20-38"},
+  {d:"2026-09-28",j:"Lun",at:"Josué 22–24",nt:"Luc 22.1-23"},
+  {d:"2026-09-29",j:"Mar",at:"Juges 1.1–3.6",nt:"Luc 22.24-38"},
+  {d:"2026-09-30",j:"Mer",at:"Juges 3.7–5.31",nt:"Luc 22.39-62"},
+  {d:"2026-10-01",j:"Jeu",at:"Juges 6.1–8.21",nt:"Luc 22.63–23.25"},
+  {d:"2026-10-02",j:"Ven",at:"Juges 8.22–9.57",nt:"Luc 23.26-49"},
+  {d:"2026-10-03",j:"Sam",at:"Juges 10–12",nt:"Luc 23.50–24.12"},
+  {d:"2026-10-04",j:"Dim",at:"Juges 13–16",nt:"Luc 24.13-35"},
+  {d:"2026-10-05",j:"Lun",at:"Juges 17–18",nt:"Luc 24.36-53"},
+  {d:"2026-10-06",j:"Mar",at:"Juges 19–21",nt:"Actes 1"},
+  {d:"2026-10-07",j:"Mer",at:"Ruth 1–4",nt:"Actes 2.1-21"},
+  {d:"2026-10-08",j:"Jeu",at:"1 Samuel 1–3",nt:"Actes 2.22-47"},
+  {d:"2026-10-09",j:"Ven",at:"1 Samuel 4–7",nt:"Actes 3"},
+  {d:"2026-10-10",j:"Sam",at:"1 Samuel 8–10",nt:"Actes 4.1-31"},
+  {d:"2026-10-11",j:"Dim",at:"1 Samuel 11–12",nt:"Actes 4.32–5.11"},
+  {d:"2026-10-12",j:"Lun",at:"1 Samuel 13–14",nt:"Actes 5.12-42"},
+  {d:"2026-10-13",j:"Mar",at:"1 Samuel 15–16",nt:"Actes 6"},
+  {d:"2026-10-14",j:"Mer",at:"1 Samuel 17–18",nt:"Actes 7.1-16"},
+  {d:"2026-10-15",j:"Jeu",at:"1 Samuel 19.1–21.1 ; Psaumes 59",nt:"Actes 7.17-38"},
+  {d:"2026-10-16",j:"Ven",at:"1 Samuel 21.2-16 ; Psaumes 34 ; 56 ; 52",nt:"Actes 7.39-50"},
+  {d:"2026-10-17",j:"Sam",at:"1 Samuel 22–23 ; Psaumes 54",nt:"Actes 7.51–8.3"},
+  {d:"2026-10-18",j:"Dim",at:"1 Samuel 24 ; Psaumes 57 ; 142 ; 63",nt:"Actes 8.4-25"},
+  {d:"2026-10-19",j:"Lun",at:"1 Samuel 25–26",nt:"Actes 8.26-40"},
+  {d:"2026-10-20",j:"Mar",at:"1 Samuel 27–30",nt:"Actes 9.1-22"},
+  {d:"2026-10-21",j:"Mer",at:"1 Samuel 31 ; Psaumes 18",nt:"Actes 9.23-43"},
+  {d:"2026-10-22",j:"Jeu",at:"1 Chroniques 3.1–5.26",nt:"Actes 10.1-23"},
+  {d:"2026-10-23",j:"Ven",at:"1 Chroniques 5.27–6.66",nt:"Actes 10.24-48"},
+  {d:"2026-10-24",j:"Sam",at:"1 Chroniques 7–9",nt:"Actes 11"},
+  {d:"2026-10-25",j:"Dim",at:"1 Chroniques 10 ; 2 Samuel 1–2",nt:"Actes 12"},
+  {d:"2026-10-26",j:"Lun",at:"2 Samuel 3–5",nt:"Jacques 1"},
+  {d:"2026-10-27",j:"Mar",at:"1 Chroniques 11–12",nt:"Jacques 2"},
+  {d:"2026-10-28",j:"Mer",at:"1 Chroniques 13–15 ; 2 Samuel 6",nt:"Jacques 3"},
+  {d:"2026-10-29",j:"Jeu",at:"1 Chroniques 16 ; Psaumes 8 ; 132",nt:"Jacques 4"},
+  {d:"2026-10-30",j:"Ven",at:"Psaumes 50 ; 73–74",nt:"Jacques 5"},
+  {d:"2026-10-31",j:"Sam",at:"Psaumes 75–77",nt:"Actes 13.1-43"},
+  {d:"2026-11-01",j:"Dim",at:"Psaumes 78",nt:"Actes 13.44–14.28"},
+  {d:"2026-11-02",j:"Lun",at:"Psaumes 79–83",nt:"Galates 1"},
+  {d:"2026-11-03",j:"Mar",at:"2 Samuel 7 ; 1 Chroniques 17 ; Psaumes 89",nt:"Galates 2"},
+  {d:"2026-11-04",j:"Mer",at:"2 Samuel 8 ; 1 Chroniques 18 ; Psaumes 60",nt:"Galates 3.1-18"},
+  {d:"2026-11-05",j:"Jeu",at:"2 Samuel 9–10 ; 1 Chroniques 19",nt:"Galates 3.19–4.20"},
+  {d:"2026-11-06",j:"Ven",at:"2 Samuel 11–12 ; 1 Chroniques 20 ; Psaumes 51",nt:"Galates 4.21–5.12"},
+  {d:"2026-11-07",j:"Sam",at:"2 Samuel 13–14",nt:"Galates 5.13-26"},
+  {d:"2026-11-08",j:"Dim",at:"2 Samuel 15–17",nt:"Galates 6"},
+  {d:"2026-11-09",j:"Lun",at:"2 Samuel 18.1–19.41a",nt:"Actes 15.1-29"},
+  {d:"2026-11-10",j:"Mar",at:"2 Samuel 19.41b–21.22",nt:"Actes 15.30–16.9"},
+  {d:"2026-11-11",j:"Mer",at:"2 Samuel 22–23",nt:"Actes 16.10-40"},
+  {d:"2026-11-12",j:"Jeu",at:"2 Samuel 24 ; 1 Chroniques 21–22",nt:"Actes 17.1-14"},
+  {d:"2026-11-13",j:"Ven",at:"1 Chroniques 23–25",nt:"Actes 17.15-34"},
+  {d:"2026-11-14",j:"Sam",at:"1 Chroniques 26–27",nt:"1 Thessaloniciens 1"},
+  {d:"2026-11-15",j:"Dim",at:"1 Chroniques 28–29",nt:"1 Thessaloniciens 2.1-17"},
+  {d:"2026-11-16",j:"Lun",at:"Psaumes 1–6",nt:"1 Thessaloniciens 2.17–3.13"},
+  {d:"2026-11-17",j:"Mar",at:"Psaumes 7–10",nt:"1 Thessaloniciens 4"},
+  {d:"2026-11-18",j:"Mer",at:"Psaumes 11–17",nt:"1 Thessaloniciens 5"},
+  {d:"2026-11-19",j:"Jeu",at:"Psaumes 19–22",nt:"2 Thessaloniciens 1"},
+  {d:"2026-11-20",j:"Ven",at:"Psaumes 23–27",nt:"2 Thessaloniciens 2"},
+  {d:"2026-11-21",j:"Sam",at:"Psaumes 28–31",nt:"2 Thessaloniciens 3"},
+  {d:"2026-11-22",j:"Dim",at:"Psaumes 32–33 ; 35",nt:"Actes 18.1-22"},
+  {d:"2026-11-23",j:"Lun",at:"Psaumes 36–38",nt:"Actes 18.23–19.20"},
+  {d:"2026-11-24",j:"Mar",at:"Psaumes 39–41 ; 53 ; 55",nt:"1 Corinthiens 1"},
+  {d:"2026-11-25",j:"Mer",at:"Psaumes 58 ; 61–62 ; 64–65",nt:"1 Corinthiens 2"},
+  {d:"2026-11-26",j:"Jeu",at:"Psaumes 66–68",nt:"1 Corinthiens 3.1–4.5"},
+  {d:"2026-11-27",j:"Ven",at:"Psaumes 69–71",nt:"1 Corinthiens 4.6-21"},
+  {d:"2026-11-28",j:"Sam",at:"Psaumes 86 ; 101–103",nt:"1 Corinthiens 5"},
+  {d:"2026-11-29",j:"Dim",at:"Psaumes 108–110",nt:"1 Corinthiens 6"},
+  {d:"2026-11-30",j:"Lun",at:"Psaumes 122 ; 124 ; 131 ; 133 ; 138–139",nt:"1 Corinthiens 7.1-24"},
+  {d:"2026-12-01",j:"Mar",at:"Psaumes 140–145",nt:"1 Corinthiens 7.25-40"},
+  {d:"2026-12-02",j:"Mer",at:"1 Rois 1–2",nt:"1 Corinthiens 8"},
+  {d:"2026-12-03",j:"Jeu",at:"1 Rois 3 ; 2 Chroniques 1.1-17 ; Psaumes 72",nt:"1 Corinthiens 9.1-23"},
+  {d:"2026-12-04",j:"Ven",at:"1 Rois 4–5 ; 2 Chroniques 1.18–2.17",nt:"1 Corinthiens 9.24–10.12"},
+  {d:"2026-12-05",j:"Sam",at:"1 Rois 6 ; 2 Chroniques 3",nt:"1 Corinthiens 10.13–11.1"},
+  {d:"2026-12-06",j:"Dim",at:"1 Rois 7 ; 2 Chroniques 4",nt:"1 Corinthiens 11.2-16"},
+  {d:"2026-12-07",j:"Lun",at:"1 Rois 8–9",nt:"1 Corinthiens 11.17-34"},
+  {d:"2026-12-08",j:"Mar",at:"2 Chroniques 5–8",nt:"1 Corinthiens 12"},
+  {d:"2026-12-09",j:"Mer",at:"Psaumes 123 ; 125–130 ; 134",nt:"1 Corinthiens 13"},
+  {d:"2026-12-10",j:"Jeu",at:"Cantique 1–4",nt:"1 Corinthiens 14.1-19"},
+  {d:"2026-12-11",j:"Ven",at:"Cantique 5–8",nt:"1 Corinthiens 14.20-40"},
+  {d:"2026-12-12",j:"Sam",at:"1 Rois 10–11 ; 2 Chroniques 9",nt:"1 Corinthiens 15.1-34"},
+  {d:"2026-12-13",j:"Dim",at:"Proverbes 1.1–3.10",nt:"1 Corinthiens 15.35-58"},
+  {d:"2026-12-14",j:"Lun",at:"Proverbes 3.11–7.27",nt:"1 Corinthiens 16"},
+  {d:"2026-12-15",j:"Mar",at:"Proverbes 8–9",nt:"Actes 19.21–20.1"},
+  {d:"2026-12-16",j:"Mer",at:"Proverbes 10.1–12.14",nt:"2 Corinthiens 1.1-11"},
+  {d:"2026-12-17",j:"Jeu",at:"Proverbes 12.15–14.35",nt:"2 Corinthiens 1.12–2.13"},
+  {d:"2026-12-18",j:"Ven",at:"Proverbes 15–16",nt:"2 Corinthiens 2.14–3.18"},
+  {d:"2026-12-19",j:"Sam",at:"Proverbes 17–19",nt:"2 Corinthiens 4.1-15"},
+  {d:"2026-12-20",j:"Dim",at:"Proverbes 20.1–22.16",nt:"2 Corinthiens 4.16–5.10"},
+  {d:"2026-12-21",j:"Lun",at:"Proverbes 22.17–24.34",nt:"2 Corinthiens 5.11–6.10"},
+  {d:"2026-12-22",j:"Mar",at:"Psaumes 44–46",nt:"2 Corinthiens 6.11–7.16"},
+  {d:"2026-12-23",j:"Mer",at:"Psaumes 47–49",nt:"2 Corinthiens 8"},
+  {d:"2026-12-24",j:"Jeu",at:"Psaumes 84–85 ; 87–88",nt:"2 Corinthiens 9"},
+  {d:"2026-12-25",j:"Ven",at:"Ecclésiaste 1–3",nt:"2 Corinthiens 10"},
+  {d:"2026-12-26",j:"Sam",at:"Ecclésiaste 4–6",nt:"2 Corinthiens 11.1-15"},
+  {d:"2026-12-27",j:"Dim",at:"Ecclésiaste 7–9",nt:"2 Corinthiens 11.16-33"},
+  {d:"2026-12-28",j:"Lun",at:"Ecclésiaste 10–12",nt:"2 Corinthiens 12.1-13"},
+  {d:"2026-12-29",j:"Mar",at:"2 Chroniques 10–12 ; 1 Rois 12.1-24 ; 14.21-31",nt:"2 Corinthiens 12.14–13.13"},
+  {d:"2026-12-30",j:"Mer",at:"1 Rois 12.25–14.20",nt:"Actes 20.2-15"},
+  {d:"2026-12-31",j:"Jeu",at:"2 Chroniques 13 ; 1 Rois 15.1-8",nt:"Romains 1.1-17"},
+  {d:"2027-01-01",j:"Ven",at:"2 Chroniques 14–16 ; 1 Rois 15.9-24",nt:"Romains 1.18–2.16"},
+  {d:"2027-01-02",j:"Sam",at:"1 Rois 15.25–17.24",nt:"Romains 2.17–3.20"},
+  {d:"2027-01-03",j:"Dim",at:"1 Rois 18–19",nt:"Romains 3.21–4.25"},
+  {d:"2027-01-04",j:"Lun",at:"1 Rois 20–21",nt:"Romains 5"},
+  {d:"2027-01-05",j:"Mar",at:"1 Rois 22.1-51 ; 2 Chroniques 17",nt:"Romains 6"},
+  {d:"2027-01-06",j:"Mer",at:"2 Chroniques 18–20",nt:"Romains 7"},
+  {d:"2027-01-07",j:"Jeu",at:"1 Rois 22.52-54 ; 2 Rois 1–2",nt:"Romains 8.1-17"},
+  {d:"2027-01-08",j:"Ven",at:"2 Rois 3–5",nt:"Romains 8.18-39"},
+  {d:"2027-01-09",j:"Sam",at:"2 Rois 6.1–8.15",nt:"Romains 9.1-29"},
+  {d:"2027-01-10",j:"Dim",at:"2 Rois 8.16-29 ; 2 Chroniques 21.1–22.9 ; Abdias",nt:"Romains 9.30–10.11"},
+  {d:"2027-01-11",j:"Lun",at:"2 Rois 9–10",nt:"Romains 10.12–11.10"},
+  {d:"2027-01-12",j:"Mar",at:"2 Chroniques 22.10–23.21 ; 2 Rois 11",nt:"Romains 11.11-36"},
+  {d:"2027-01-13",j:"Mer",at:"2 Chroniques 24 ; 2 Rois 12",nt:"Romains 12"},
+  {d:"2027-01-14",j:"Jeu",at:"Joël 1–4",nt:"Romains 13"},
+  {d:"2027-01-15",j:"Ven",at:"2 Rois 13.1–14.22 ; 2 Chroniques 25",nt:"Romains 14"},
+  {d:"2027-01-16",j:"Sam",at:"2 Rois 14.23-29 ; Amos 1–4",nt:"Romains 15.1-13"},
+  {d:"2027-01-17",j:"Dim",at:"Amos 5–9",nt:"Romains 15.14-33"},
+  {d:"2027-01-18",j:"Lun",at:"Jonas 1–4",nt:"Romains 16"},
+  {d:"2027-01-19",j:"Mar",at:"Osée 1–3 ; 2 Chroniques 26 ; 2 Rois 15.1-7 ; Ésaïe 6",nt:"Actes 20.16-38"},
+  {d:"2027-01-20",j:"Mer",at:"2 Rois 15.8-26, 32-38 ; 2 Chroniques 27 ; Ésaïe 1",nt:"Actes 21.1-25"},
+  {d:"2027-01-21",j:"Jeu",at:"Ésaïe 2–5",nt:"Actes 21.26–22.1"},
+  {d:"2027-01-22",j:"Ven",at:"2 Chroniques 28 ; 2 Rois 16 ; 15.27-31 ; Ésaïe 7",nt:"Actes 22.2-29"},
+  {d:"2027-01-23",j:"Sam",at:"Ésaïe 8–9",nt:"Actes 22.30–23.10"},
+  {d:"2027-01-24",j:"Dim",at:"Ésaïe 10–12",nt:"Actes 23.11-35"},
+  {d:"2027-01-25",j:"Lun",at:"Michée 1–5",nt:"Actes 24"},
+  {d:"2027-01-26",j:"Mar",at:"Osée 4–5",nt:"Actes 25"},
+  {d:"2027-01-27",j:"Mer",at:"Osée 6–7",nt:"Actes 26"},
+  {d:"2027-01-28",j:"Jeu",at:"Osée 8–10",nt:"Actes 27.1-26"},
+  {d:"2027-01-29",j:"Ven",at:"Osée 11–12",nt:"Actes 27.27-44"},
+  {d:"2027-01-30",j:"Sam",at:"Osée 13–14",nt:"Actes 28.1-15"},
+  {d:"2027-01-31",j:"Dim",at:"2 Rois 17",nt:"Actes 28.16-31"},
+  {d:"2027-02-01",j:"Lun",at:"2 Rois 18.1-12 ; 2 Chroniques 29",nt:"Philippiens 1"},
+  {d:"2027-02-02",j:"Mar",at:"2 Chroniques 30–31",nt:"Philippiens 2"},
+  {d:"2027-02-03",j:"Mer",at:"Michée 6–7",nt:"Philippiens 3.1–4.1"},
+  {d:"2027-02-04",j:"Jeu",at:"Ésaïe 13–14",nt:"Philippiens 4.2-23"},
+  {d:"2027-02-05",j:"Ven",at:"Ésaïe 15–16",nt:"Éphésiens 1"},
+  {d:"2027-02-06",j:"Sam",at:"Ésaïe 17–18",nt:"Éphésiens 2"},
+  {d:"2027-02-07",j:"Dim",at:"Ésaïe 19–20",nt:"Éphésiens 3"},
+  {d:"2027-02-08",j:"Lun",at:"Ésaïe 21–23",nt:"Éphésiens 4.1-16"},
+  {d:"2027-02-09",j:"Mar",at:"Ésaïe 24–25",nt:"Éphésiens 4.17–5.17"},
+  {d:"2027-02-10",j:"Mer",at:"Ésaïe 26–27",nt:"Éphésiens 5.18–6.24"},
+  {d:"2027-02-11",j:"Jeu",at:"Ésaïe 28–29",nt:"Philémon"},
+  {d:"2027-02-12",j:"Ven",at:"Ésaïe 30–31",nt:"Colossiens 1.1-23"},
+  {d:"2027-02-13",j:"Sam",at:"Ésaïe 32–33",nt:"Colossiens 1.24–2.23"},
+  {d:"2027-02-14",j:"Dim",at:"Ésaïe 34–35",nt:"Colossiens 3.1–4.1"},
+  {d:"2027-02-15",j:"Lun",at:"Proverbes 25–26",nt:"Colossiens 4.2-18"},
+  {d:"2027-02-16",j:"Mar",at:"Proverbes 27–28",nt:"1 Pierre 1.1-21"},
+  {d:"2027-02-17",j:"Mer",at:"Proverbes 29–30",nt:"1 Pierre 1.22–2.10"},
+  {d:"2027-02-18",j:"Jeu",at:"Proverbes 31",nt:"1 Pierre 2.11–3.12"},
+  {d:"2027-02-19",j:"Ven",at:"Psaumes 91–93",nt:"1 Pierre 3.13–4.19"},
+  {d:"2027-02-20",j:"Sam",at:"Psaumes 94–95",nt:"1 Pierre 5"},
+  {d:"2027-02-21",j:"Dim",at:"Psaumes 96–97",nt:"1 Timothée 1"},
+  {d:"2027-02-22",j:"Lun",at:"Psaumes 98–100",nt:"1 Timothée 2"},
+  {d:"2027-02-23",j:"Mar",at:"Psaumes 104–105",nt:"1 Timothée 3"},
+  {d:"2027-02-24",j:"Mer",at:"Psaumes 106–107",nt:"1 Timothée 4"},
+  {d:"2027-02-25",j:"Jeu",at:"Psaumes 111–113",nt:"1 Timothée 5"},
+  {d:"2027-02-26",j:"Ven",at:"Psaumes 114–116",nt:"1 Timothée 6"},
+  {d:"2027-02-27",j:"Sam",at:"Psaumes 117–118",nt:"Tite 1"},
+  {d:"2027-02-28",j:"Dim",at:"Psaumes 119.1-48",nt:"Tite 2"},
+  {d:"2027-03-01",j:"Lun",at:"Psaumes 119.49-88",nt:"Tite 3"},
+  {d:"2027-03-02",j:"Mar",at:"Psaumes 119.89-136",nt:"2 Timothée 1"},
+  {d:"2027-03-03",j:"Mer",at:"Psaumes 119.137-176",nt:"2 Timothée 2"},
+  {d:"2027-03-04",j:"Jeu",at:"Psaumes 120–121",nt:"2 Timothée 3.1–4.8"},
+  {d:"2027-03-05",j:"Ven",at:"Psaumes 135–136",nt:"2 Timothée 4.9-22"},
+  {d:"2027-03-06",j:"Sam",at:"2 Rois 18.13–19.37 ; 2 Chroniques 32.1-23",nt:"2 Pierre 1"},
+  {d:"2027-03-07",j:"Dim",at:"Ésaïe 36–37",nt:"2 Pierre 2"},
+  {d:"2027-03-08",j:"Lun",at:"2 Rois 20.1-11 ; Ésaïe 38",nt:"2 Pierre 3"},
+  {d:"2027-03-09",j:"Mar",at:"2 Rois 20.12-21 ; Ésaïe 39 ; 2 Chroniques 32.24-33",nt:"Hébreux 1"},
+  {d:"2027-03-10",j:"Mer",at:"Ésaïe 40–41",nt:"Hébreux 2"},
+  {d:"2027-03-11",j:"Jeu",at:"Ésaïe 42–43",nt:"Hébreux 3"},
+  {d:"2027-03-12",j:"Ven",at:"Ésaïe 44",nt:"Hébreux 4.1-13"},
+  {d:"2027-03-13",j:"Sam",at:"Ésaïe 45",nt:"Hébreux 4.14–5.10"},
+  {d:"2027-03-14",j:"Dim",at:"Ésaïe 46–47",nt:"Hébreux 5.11–6.20"},
+  {d:"2027-03-15",j:"Lun",at:"Ésaïe 48–49",nt:"Hébreux 7"},
+  {d:"2027-03-16",j:"Mar",at:"Ésaïe 50.1–52.12",nt:"Hébreux 8"},
+  {d:"2027-03-17",j:"Mer",at:"Ésaïe 52.13–53.12",nt:"Hébreux 9"},
+  {d:"2027-03-18",j:"Jeu",at:"Ésaïe 54.1–56.8",nt:"Hébreux 10.1-22"},
+  {d:"2027-03-19",j:"Ven",at:"Ésaïe 56.9–58.14",nt:"Hébreux 10.23-39"},
+  {d:"2027-03-20",j:"Sam",at:"Ésaïe 59–60",nt:"Hébreux 11.1-22"},
+  {d:"2027-03-21",j:"Dim",at:"Ésaïe 61–62",nt:"Hébreux 11.23-40"},
+  {d:"2027-03-22",j:"Lun",at:"Ésaïe 63–64",nt:"Hébreux 12"},
+  {d:"2027-03-23",j:"Mar",at:"Ésaïe 65–66",nt:"Hébreux 13"},
+  {d:"2027-03-24",j:"Mer",at:"2 Rois 21.1-18 ; 2 Chroniques 33.1-20 ; Nahum",nt:"Jude"},
+  {d:"2027-03-25",j:"Jeu",at:"2 Rois 21.19-26 ; 2 Chroniques 33.21-25 ; Sophonie",nt:"Jean 1.1-18"},
+  {d:"2027-03-26",j:"Ven",at:"2 Rois 22.1–23.30 ; 2 Chroniques 34–35",nt:"Jean 1.19-51"},
+  {d:"2027-03-27",j:"Sam",at:"Jérémie 1–3",nt:"Jean 2"},
+  {d:"2027-03-28",j:"Dim",at:"Jérémie 4–6",nt:"Jean 3.1-21"},
+  {d:"2027-03-29",j:"Lun",at:"2 Rois 23.31–24.7 ; 2 Chroniques 36.1-8 ; Jérémie 7.1–8.17",nt:"Jean 3.22-36"},
+  {d:"2027-03-30",j:"Mar",at:"Jérémie 8.18–10.25",nt:"Jean 4.1-42"},
+  {d:"2027-03-31",j:"Mer",at:"Jérémie 11–13",nt:"Jean 4.43-54"},
+  {d:"2027-04-01",j:"Jeu",at:"Jérémie 14–16",nt:"Jean 5.1-18"},
+  {d:"2027-04-02",j:"Ven",at:"Jérémie 17.1–19.13",nt:"Jean 5.19-47"},
+  {d:"2027-04-03",j:"Sam",at:"Jérémie 19.14–20.18 ; 26–27",nt:"Jean 6.1-21"},
+  {d:"2027-04-04",j:"Dim",at:"Jérémie 30–31",nt:"Jean 6.22-40"},
+  {d:"2027-04-05",j:"Lun",at:"Habacuc ; Jérémie 25",nt:"Jean 6.41-71"},
+  {d:"2027-04-06",j:"Mar",at:"Jérémie 36 ; 45–47",nt:"Jean 7.1-36"},
+  {d:"2027-04-07",j:"Mer",at:"Jérémie 48–49",nt:"Jean 7.37-53"},
+  {d:"2027-04-08",j:"Jeu",at:"Jérémie 50–51",nt:"Jean 8.1-29"},
+  {d:"2027-04-09",j:"Ven",at:"Daniel 1–2",nt:"Jean 8.30-59"},
+  {d:"2027-04-10",j:"Sam",at:"Daniel 3–4",nt:"Jean 9.1-23"},
+  {d:"2027-04-11",j:"Dim",at:"Jérémie 22–23",nt:"Jean 9.24-41"},
+  {d:"2027-04-12",j:"Lun",at:"Jérémie 35 ; 2 Rois 24.8–25.30 ; 2 Chroniques 36.9-10",nt:"Jean 10.1-21"},
+  {d:"2027-04-13",j:"Mar",at:"Jérémie 24 ; 29 ; 28",nt:"Jean 10.22-42"},
+  {d:"2027-04-14",j:"Mer",at:"Ézéchiel 1–3",nt:"Jean 11.1-19"},
+  {d:"2027-04-15",j:"Jeu",at:"Ézéchiel 4–7",nt:"Jean 11.20-44"},
+  {d:"2027-04-16",j:"Ven",at:"Ézéchiel 8–11",nt:"Jean 11.45-57"},
+  {d:"2027-04-17",j:"Sam",at:"Ézéchiel 12–15",nt:"Jean 12.1-19"},
+  {d:"2027-04-18",j:"Dim",at:"Ézéchiel 16",nt:"Jean 12.20-36"},
+  {d:"2027-04-19",j:"Lun",at:"Ézéchiel 17–19",nt:"Jean 12.37-50"},
+  {d:"2027-04-20",j:"Mar",at:"Ézéchiel 20–21",nt:"Jean 13.1-20"},
+  {d:"2027-04-21",j:"Mer",at:"Ézéchiel 22–23",nt:"Jean 13.21-38"},
+  {d:"2027-04-22",j:"Jeu",at:"Ézéchiel 24–25",nt:"Jean 14"},
+  {d:"2027-04-23",j:"Ven",at:"Ézéchiel 26–28",nt:"Jean 15.1-17"},
+  {d:"2027-04-24",j:"Sam",at:"Ézéchiel 29–30",nt:"Jean 15.18–16.11"},
+  {d:"2027-04-25",j:"Dim",at:"Ézéchiel 31–32",nt:"Jean 16.12-33"},
+  {d:"2027-04-26",j:"Lun",at:"Jérémie 21 ; 32",nt:"Jean 17"},
+  {d:"2027-04-27",j:"Mar",at:"Jérémie 33–34 ; 37",nt:"Jean 18.1-11"},
+  {d:"2027-04-28",j:"Mer",at:"Jérémie 38–41",nt:"Jean 18.12-27"},
+  {d:"2027-04-29",j:"Jeu",at:"Jérémie 42–44",nt:"Jean 18.28–19.16"},
+  {d:"2027-04-30",j:"Ven",at:"Jérémie 52 ; Lamentations 1–2",nt:"Jean 19.17-42"},
+  {d:"2027-05-01",j:"Sam",at:"Lamentations 3",nt:"Jean 20"},
+  {d:"2027-05-02",j:"Dim",at:"Lamentations 4–5 ; Ézéchiel 33",nt:"Jean 21"},
+  {d:"2027-05-03",j:"Lun",at:"Ézéchiel 34–36",nt:"1 Jean 1.1–2.2"},
+  {d:"2027-05-04",j:"Mar",at:"Ézéchiel 37–39",nt:"1 Jean 2.3-17"},
+  {d:"2027-05-05",j:"Mer",at:"Ézéchiel 40",nt:"1 Jean 2.18-29"},
+  {d:"2027-05-06",j:"Jeu",at:"Ézéchiel 41–43",nt:"1 Jean 3"},
+  {d:"2027-05-07",j:"Ven",at:"Ézéchiel 44–46",nt:"1 Jean 4"},
+  {d:"2027-05-08",j:"Sam",at:"Ézéchiel 47–48 ; Psaumes 137",nt:"1 Jean 5"},
+  {d:"2027-05-09",j:"Dim",at:"Psaumes 42–43 ; Daniel 7–8",nt:"2 Jean"},
+  {d:"2027-05-10",j:"Lun",at:"Daniel 5–6 ; 9",nt:"3 Jean"},
+  {d:"2027-05-11",j:"Mar",at:"2 Chroniques 36.11-23 ; Esdras 1.1–2.58",nt:"Apocalypse 1"},
+  {d:"2027-05-12",j:"Mer",at:"Esdras 2.59–4.24",nt:"Apocalypse 2"},
+  {d:"2027-05-13",j:"Jeu",at:"Daniel 10–12",nt:"Apocalypse 3"},
+  {d:"2027-05-14",j:"Ven",at:"Aggée 1–2 ; Esdras 5–6",nt:"Apocalypse 4"},
+  {d:"2027-05-15",j:"Sam",at:"Zacharie 1–4",nt:"Apocalypse 5"},
+  {d:"2027-05-16",j:"Dim",at:"Zacharie 5–8",nt:"Apocalypse 6"},
+  {d:"2027-05-17",j:"Lun",at:"Zacharie 9–11",nt:"Apocalypse 7"},
+  {d:"2027-05-18",j:"Mar",at:"Zacharie 12–14",nt:"Apocalypse 8"},
+  {d:"2027-05-19",j:"Mer",at:"Esther 1–2",nt:"Apocalypse 9"},
+  {d:"2027-05-20",j:"Jeu",at:"Esther 3–6",nt:"Apocalypse 10"},
+  {d:"2027-05-21",j:"Ven",at:"Esther 7–10",nt:"Apocalypse 11"},
+  {d:"2027-05-22",j:"Sam",at:"Esdras 7–8",nt:"Apocalypse 12"},
+  {d:"2027-05-23",j:"Dim",at:"Esdras 9–10",nt:"Apocalypse 13"},
+  {d:"2027-05-24",j:"Lun",at:"Malachie 1–3",nt:"Apocalypse 14"},
+  {d:"2027-05-25",j:"Mar",at:"Néhémie 1.1–3.32",nt:"Apocalypse 15"},
+  {d:"2027-05-26",j:"Mer",at:"Néhémie 3.33–6.19",nt:"Apocalypse 16"},
+  {d:"2027-05-27",j:"Jeu",at:"Néhémie 7–8",nt:"Apocalypse 17"},
+  {d:"2027-05-28",j:"Ven",at:"Néhémie 9",nt:"Apocalypse 18"},
+  {d:"2027-05-29",j:"Sam",at:"Néhémie 10–11",nt:"Apocalypse 19"},
+  {d:"2027-05-30",j:"Dim",at:"Néhémie 12–13",nt:"Apocalypse 20"},
+  {d:"2027-05-31",j:"Lun",at:"Psaumes 146–147",nt:"Apocalypse 21.1–22.5"},
+  {d:"2027-06-01",j:"Mar",at:"Psaumes 148–150",nt:"Apocalypse 22.6-21"},
+];
+
+const TOTAL = PLAN.length;
+const TODAY = "2026-06-14";
+
+// ═══════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════
+let st = {};
+try { const r = localStorage.getItem("bible_2026_full"); if(r) st = JSON.parse(r); } catch(e){}
+function save() { try { localStorage.setItem("bible_2026_full", JSON.stringify(st)); } catch(e){} }
+
+let view = "week"; // "week" | "month"
+let curKey = null;   // current week key or month key
+let openMap = {};
+
+// ═══════════════════════════════════════════
+// BUILD WEEK GROUPS
+// ═══════════════════════════════════════════
+// Each week: Mon–Sun (ISO week), but we group by plan continuity
+function isoWeekKey(dateStr) {
+  const d = new Date(dateStr + "T00:00:00");
+  // Get Monday of the week
+  const day = d.getDay(); // 0=Sun
+  const diff = (day === 0) ? -6 : 1 - day;
+  const mon = new Date(d);
+  mon.setDate(d.getDate() + diff);
+  return mon.toISOString().slice(0,10); // "2026-06-01"
+}
+
+// Group plan into weeks
+const weekMap = new Map(); // weekKey -> [days]
+for(const p of PLAN) {
+  const wk = isoWeekKey(p.d);
+  if(!weekMap.has(wk)) weekMap.set(wk, []);
+  weekMap.get(wk).push(p);
+}
+const WEEKS = [...weekMap.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([k,days])=>({k,days}));
+
+// Month groups
+const monthMap = new Map();
+for(const p of PLAN) {
+  const mk = p.d.slice(0,7);
+  if(!monthMap.has(mk)) monthMap.set(mk,{k:mk, days:[]});
+  monthMap.get(mk).days.push(p);
+}
+const MONTHS_ARR = [...monthMap.values()].sort((a,b)=>a.k.localeCompare(b.k));
+
+const MONTH_NAMES = {
+  "01":"Janvier","02":"Février","03":"Mars","04":"Avril",
+  "05":"Mai","06":"Juin","07":"Juillet","08":"Août",
+  "09":"Septembre","10":"Octobre","11":"Novembre","12":"Décembre"
+};
+
+function fmtDate(s) { const[,m,d]=s.split("-"); return `${d}/${m}`; }
+function fmtMonth(mk) { const[y,m]=mk.split("-"); return `${MONTH_NAMES[m]} ${y.slice(2)}`; }
+function fmtWeekLabel(wk) {
+  // "S1 · 1–7 juin"
+  const days = weekMap.get(wk);
+  const first = days[0].d, last = days[days.length-1].d;
+  const [,fm,fd] = first.split("-"); const [,lm,ld] = last.split("-");
+  const range = fm===lm ? `${parseInt(fd)}–${parseInt(ld)} ${MONTH_NAMES[fm].toLowerCase()}`
+    : `${parseInt(fd)} ${MONTH_NAMES[fm].slice(0,3).toLowerCase()}–${parseInt(ld)} ${MONTH_NAMES[lm].slice(0,3).toLowerCase()}`;
+  return range;
+}
+function weekSerial(wk) {
+  return WEEKS.findIndex(w=>w.k===wk)+1;
+}
+
+// ═══════════════════════════════════════════
+// PROGRESS
+// ═══════════════════════════════════════════
+function getStreak() {
+  let s=0, prev=null;
+  for(const p of [...PLAN].sort((a,b)=>b.d.localeCompare(a.d))) {
+    if(!st[p.d]?.done) break;
+    if(prev && (new Date(prev)-new Date(p.d))/86400000!==1) break;
+    s++; prev=p.d;
+  }
+  return s;
+}
+
+function countFullWeeks() {
+  return WEEKS.filter(w=>w.days.every(p=>st[p.d]?.done)).length;
+}
+
+function renderProgress() {
+  const done = PLAN.filter(p=>st[p.d]?.done).length;
+  const pct = Math.round(done/TOTAL*100);
+  document.getElementById("bar").style.width = pct+"%";
+  document.getElementById("pct").textContent = pct+"%";
+  document.getElementById("s-done").textContent = done;
+  document.getElementById("s-left").textContent = TOTAL-done;
+  document.getElementById("s-streak").textContent = getStreak();
+  document.getElementById("s-weeks").textContent = countFullWeeks();
+  document.getElementById("done-banner").classList.toggle("show", done===TOTAL);
+  // refresh nav badges
+  renderNav();
+}
+
+// ═══════════════════════════════════════════
+// VIEW TOGGLE
+// ═══════════════════════════════════════════
+function setView(v) {
+  view = v;
+  document.getElementById("vbtn-week").classList.toggle("on", v==="week");
+  document.getElementById("vbtn-month").classList.toggle("on", v==="month");
+  // pick sensible default key
+  if(v==="week") {
+    const todayWk = isoWeekKey(TODAY);
+    curKey = WEEKS.find(w=>w.k===todayWk) ? todayWk : WEEKS[0].k;
+  } else {
+    curKey = TODAY.slice(0,7);
+  }
+  renderNav();
+  renderContent();
+}
+
+// ═══════════════════════════════════════════
+// NAV
+// ═══════════════════════════════════════════
+function renderNav() {
+  const nav = document.getElementById("nav-scroll");
+  if(view==="week") {
+    nav.innerHTML = WEEKS.map((w,i)=>{
+      const allDone = w.days.every(p=>st[p.d]?.done);
+      const anyDone = w.days.some(p=>st[p.d]?.done);
+      const cls = allDone?"full":anyDone?"partial":"";
+      return `<button class="nbtn${w.k===curKey?" on":""} ${cls}" data-k="${w.k}">S${i+1}</button>`;
+    }).join("");
+  } else {
+    nav.innerHTML = MONTHS_ARR.map(m=>{
+      const allDone = m.days.every(p=>st[p.d]?.done);
+      const anyDone = m.days.some(p=>st[p.d]?.done);
+      const cls = allDone?"full":anyDone?"partial":"";
+      const [y,mo]=m.k.split("-");
+      return `<button class="nbtn${m.k===curKey?" on":""} ${cls}" data-k="${m.k}">${MONTH_NAMES[mo].slice(0,4)} ${y.slice(2)}</button>`;
+    }).join("");
+  }
+  nav.querySelectorAll(".nbtn").forEach(btn=>{
+    btn.onclick = () => { curKey=btn.dataset.k; renderNav(); renderContent(); };
+  });
+  // scroll active into view
+  const active = nav.querySelector(".on");
+  if(active) requestAnimationFrame(()=>active.scrollIntoView({inline:"center",behavior:"smooth"}));
+}
+
+// ═══════════════════════════════════════════
+// DAY CARD HTML
+// ═══════════════════════════════════════════
+function dayCardHTML(p) {
+  const done = !!st[p.d]?.done;
+  const isToday = p.d===TODAY;
+  const isOpen = !!openMap[p.d];
+  const note = st[p.d]?.note||"";
+  const ntLine = p.nt ? ` &nbsp;·&nbsp; <span class="nt">NT</span> ${p.nt}`:"";
+  return `<div class="day${done?" done":""}${isToday?" today":""}${isOpen?" open":""}" id="c-${p.d}">
+    <div class="day-row">
+      <div class="check" data-ck="${p.d}"><svg viewBox="0 0 12 10"><polyline points="1.5,5 4.5,8.5 10.5,1.5"/></svg></div>
+      <div class="day-info" data-ex="${p.d}">
+        <div class="day-top">
+          <span class="day-date">${fmtDate(p.d)} · ${p.j}</span>
+          ${isToday?'<span class="today-pill">Aujourd\'hui</span>':""}
+        </div>
+        <div class="day-refs"><span class="at">AT</span> ${p.at}${ntLine}</div>
+      </div>
+      <div class="chevron" data-ex="${p.d}"><svg viewBox="0 0 14 14"><polyline points="2,4 7,9 12,4"/></svg></div>
+    </div>
+    <div class="day-detail">
+      <div class="ref-pills">
+        <div class="ref-group"><div class="ref-label">Ancien Testament</div><span class="ref-pill at">${p.at}</span></div>
+        ${p.nt?`<div class="ref-group"><div class="ref-label">Nouveau Testament</div><span class="ref-pill nt">${p.nt}</span></div>`:""}
+      </div>
+      <div class="note-box">
+        <textarea placeholder="Ce qui m'a marqué…" data-nt="${p.d}" rows="3">${note}</textarea>
+        <div class="note-hint" id="nh-${p.d}">Notes sauvegardées automatiquement</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════
+// RENDER CONTENT
+// ═══════════════════════════════════════════
+function renderContent() {
+  const c = document.getElementById("content");
+
+  if(view==="week") {
+    const w = WEEKS.find(wk=>wk.k===curKey);
+    if(!w) { c.innerHTML=""; return; }
+    const serial = weekSerial(curKey);
+    const doneCnt = w.days.filter(p=>st[p.d]?.done).length;
+    const total = w.days.length;
+    const pct = Math.round(doneCnt/total*100);
+    const complete = doneCnt===total;
+
+    const dotsHTML = w.days.map(p=>{
+      const cls = p.d===TODAY?"today":st[p.d]?.done?"done":"";
+      return `<div class="wdot${cls?" "+cls:""}"></div>`;
+    }).join("");
+
+    c.innerHTML = `<div class="week-block">
+      <div class="week-header">
+        <span class="week-title">Semaine ${serial} · ${fmtWeekLabel(curKey)}</span>
+        <div class="week-dots">${dotsHTML}</div>
+        <span class="week-pct">${doneCnt}/${total}</span>
+      </div>
+      <div class="week-bar"><div class="week-bar-fill${complete?" complete":""}" style="width:${pct}%"></div></div>
+      <div class="week-days">${w.days.map(dayCardHTML).join("")}</div>
+    </div>`;
+
+  } else {
+    const mo = MONTHS_ARR.find(m=>m.k===curKey);
+    if(!mo) { c.innerHTML=""; return; }
+    c.innerHTML = `<div class="month-days">${mo.days.map(dayCardHTML).join("")}</div>`;
+  }
+
+  bindEvents();
+
+  // scroll to today if present
+  const todayEl = document.getElementById("c-"+TODAY);
+  if(todayEl) requestAnimationFrame(()=>todayEl.scrollIntoView({behavior:"smooth",block:"center"}));
+}
+
+// ═══════════════════════════════════════════
+// BIND EVENTS
+// ═══════════════════════════════════════════
+function bindEvents() {
+  document.querySelectorAll("[data-ck]").forEach(el=>{
+    el.onclick = e=>{
+      e.stopPropagation();
+      const d=el.dataset.ck;
+      if(!st[d]) st[d]={};
+      st[d].done=!st[d].done;
+      save(); renderProgress();
+      // patch card class
+      const card=document.getElementById("c-"+d);
+      if(card) card.classList.toggle("done",st[d].done);
+      // patch week bar / dots
+      if(view==="week") refreshWeekBar();
+    };
+  });
+
+  document.querySelectorAll("[data-ex]").forEach(el=>{
+    el.onclick=()=>{
+      const d=el.dataset.ex;
+      openMap[d]=!openMap[d];
+      const card=document.getElementById("c-"+d);
+      if(card) card.classList.toggle("open",openMap[d]);
+    };
+  });
+
+  document.querySelectorAll("[data-nt]").forEach(ta=>{
+    let timer;
+    ta.oninput=()=>{
+      const d=ta.dataset.nt;
+      if(!st[d]) st[d]={};
+      st[d].note=ta.value; save();
+      const hint=document.getElementById("nh-"+d);
+      if(hint){hint.textContent="Sauvegardé ✓";hint.classList.add("flash");}
+      clearTimeout(timer);
+      timer=setTimeout(()=>{if(hint){hint.textContent="Notes sauvegardées automatiquement";hint.classList.remove("flash");}},1500);
+    };
+  });
+}
+
+function refreshWeekBar() {
+  const w = WEEKS.find(wk=>wk.k===curKey);
+  if(!w) return;
+  const doneCnt = w.days.filter(p=>st[p.d]?.done).length;
+  const pct = Math.round(doneCnt/w.days.length*100);
+  const fill = document.querySelector(".week-bar-fill");
+  if(fill){ fill.style.width=pct+"%"; fill.classList.toggle("complete",doneCnt===w.days.length); }
+  // dots
+  document.querySelectorAll(".wdot").forEach((dot,i)=>{
+    const p=w.days[i];
+    dot.className="wdot"+(p.d===TODAY?" today":st[p.d]?.done?" done":"");
+  });
+  const cnt=document.querySelector(".week-pct");
+  if(cnt) cnt.textContent=`${doneCnt}/${w.days.length}`;
+}
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+const todayWk = isoWeekKey(TODAY);
+curKey = WEEKS.find(w=>w.k===todayWk)?.k || WEEKS[0].k;
+renderProgress();
+renderNav();
+renderContent();
+</script>
+</body>
+</html>
